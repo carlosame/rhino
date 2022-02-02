@@ -10,26 +10,54 @@ package org.mozilla.javascript;
 
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Method;
+import org.mozilla.classfile.ClassFileWriter;
 
 public abstract class VMBridge {
+    static final boolean STRICT_REFLECTIVE_ACCESS = isStrictReflectiveAccess();
 
     static final VMBridge instance = makeInstance();
 
     private static VMBridge makeInstance() {
-        String[] classNames = {
-            "org.mozilla.javascript.VMBridge_custom", "org.mozilla.javascript.jdk18.VMBridge_jdk18",
-        };
-        for (int i = 0; i != classNames.length; ++i) {
-            String className = classNames[i];
-            Class<?> cl = Kit.classOrNull(className);
-            if (cl != null) {
-                VMBridge bridge = (VMBridge) Kit.newInstanceOrNull(cl);
-                if (bridge != null) {
-                    return bridge;
-                }
+        /*
+         * A custom Bridge needs to be in a different package, due to
+         * modularization rules.
+         */
+        String className = "org.mozilla.javascript.bridge.VMBridge";
+        Class<?> cl = Kit.classOrNull(className);
+        if (cl != null) {
+            VMBridge bridge = (VMBridge) Kit.newInstanceOrNull(cl);
+            if (bridge != null) {
+                return bridge;
             }
         }
+
+        // No custom bridge, instantiate version-specific Bridge
+        if (isStrictReflectiveAccess()) {
+            className = "org.mozilla.javascript.VMBridge_jdk11";
+        } else {
+            className = "org.mozilla.javascript.VMBridge_jdk8";
+        }
+
+        cl = Kit.classOrNull(className);
+        if (cl != null) {
+            VMBridge bridge = (VMBridge) Kit.newInstanceOrNull(cl);
+            if (bridge != null) {
+                return bridge;
+            }
+        }
+
         throw new IllegalStateException("Failed to create VMBridge instance");
+    }
+
+    private static boolean isStrictReflectiveAccess() {
+        boolean getModule;
+        try {
+            Class.class.getMethod("getModule");
+            getModule = true;
+        } catch (NoSuchMethodException e) {
+            getModule = false;
+        }
+        return getModule;
     }
 
     /**
@@ -60,14 +88,47 @@ public abstract class VMBridge {
     protected abstract void setContext(Object contextHelper, Context cx);
 
     /**
-     * In many JVMSs, public methods in private classes are not accessible by default (Sun Bug
-     * #4071593). VMBridge instance should try to workaround that via, for example, calling
-     * method.setAccessible(true) when it is available. The implementation is responsible to catch
-     * all possible exceptions like SecurityException if the workaround is not available.
+     * In many JVMSs, public constructors or methods in private classes are not accessible by
+     * default (Sun Bug #4071593). VMBridge instance should try to workaround that via, for example,
+     * calling method.setAccessible(true) when it is available. The implementation is responsible to
+     * catch all possible exceptions like SecurityException if the workaround is not available.
      *
+     * @param accessible the constructor.
      * @return true if it was possible to make method accessible or false otherwise.
      */
     protected abstract boolean tryToMakeAccessible(AccessibleObject accessible);
+
+    /**
+     * In many JVMSs, public methods in private classes are not accessible by default (Sun Bug
+     * #4071593). VMBridge instance should try to workaround that via, for example, calling
+     * method.setAccessible(true) when it is available. Otherwise, an alternative usable method
+     * should be provided if possible.
+     *
+     * @param target the object the underlying method is invoked from.
+     * @param method the method to be invoked.
+     * @return the method, if it was possible to find one accessible or {@code null} otherwise.
+     */
+    protected abstract Method getAccessibleMethod(Object target, Method method);
+
+    /**
+     * Generate override for the given method.
+     *
+     * @param cfw
+     * @param adapterName
+     * @param superName
+     * @param method
+     * @param generatedOverrides
+     * @param generatedMethods
+     * @param functionNames
+     */
+    protected abstract void generateOverride(
+            ClassFileWriter cfw,
+            String adapterName,
+            String superName,
+            Method method,
+            ObjToIntMap generatedOverrides,
+            ObjToIntMap generatedMethods,
+            ObjToIntMap functionNames);
 
     /**
      * Create helper object to create later proxies implementing the specified interfaces later.

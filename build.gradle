@@ -72,10 +72,6 @@ test {
 
     jvmArgs += '-Xss1280k'
 
-    if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
-        jvmArgs += ['--add-opens', 'java.desktop/javax.swing.table=ALL-UNNAMED']
-    }
-
     jacoco.excludes = ['**/testsrc_tests_ecma_3_RegExp_perlstress*']
 
     systemProperty 'java.awt.headless', 'true'
@@ -177,8 +173,7 @@ task runtimeJar(type: Jar) {
             "Bundle-ManifestVersion": "2",
             "Bundle-SymbolicName": "org.mozilla.rhino-runtime",
             "Bundle-Version": project.version.replaceAll("-.*", ""),
-            "Export-Package": "org.mozilla.javascript,org.mozilla.javascript.ast,org.mozilla.javascript.annotations",
-            "Import-Package": "javax.lang.model,javax.script"
+            "Export-Package": "org.mozilla.javascript,org.mozilla.javascript.ast,org.mozilla.javascript.annotations"
         )
     }
 }
@@ -231,8 +226,7 @@ jar {
             "Bundle-ManifestVersion": "2",
             "Bundle-SymbolicName": "org.mozilla.rhino",
             "Bundle-Version": project.version.replaceAll("-.*", ""),
-            "Export-Package": "org.mozilla.javascript,org.mozilla.javascript.ast,org.mozilla.javascript.annotations",
-            "Import-Package": "javax.lang.model,javax.script"
+            "Export-Package": "org.mozilla.javascript,org.mozilla.javascript.ast,org.mozilla.javascript.annotations"
         )
     }
 }

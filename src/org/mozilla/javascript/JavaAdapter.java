@@ -398,38 +398,14 @@ public final class JavaAdapter implements IdFunctionCall {
         Method[] methods = getOverridableMethods(superClass);
         for (int j = 0; j < methods.length; j++) {
             Method method = methods[j];
-            int mods = method.getModifiers();
-            // if a method is marked abstract, must implement it or the
-            // resulting class won't be instantiable. otherwise, if the object
-            // has a property of the same name, then an override is intended.
-            boolean isAbstractMethod = Modifier.isAbstract(mods);
-            String methodName = method.getName();
-            if (isAbstractMethod || functionNames.has(methodName)) {
-                // make sure to generate only one instance of a particular
-                // method/signature.
-                Class<?>[] argTypes = method.getParameterTypes();
-                String methodSignature = getMethodSignature(method, argTypes);
-                String methodKey = methodName + methodSignature;
-                if (!generatedOverrides.has(methodKey)) {
-                    generateMethod(
-                            cfw, adapterName, methodName, argTypes, method.getReturnType(), true);
-                    generatedOverrides.put(methodKey, 0);
-                    generatedMethods.put(methodName, 0);
-
-                    // if a method was overridden, generate a "super$method"
-                    // which lets the delegate call the superclass' version.
-                    if (!isAbstractMethod) {
-                        generateSuper(
-                                cfw,
-                                adapterName,
-                                superName,
-                                methodName,
-                                methodSignature,
-                                argTypes,
-                                method.getReturnType());
-                    }
-                }
-            }
+            VMBridge.instance.generateOverride(
+                    cfw,
+                    adapterName,
+                    superName,
+                    method,
+                    generatedOverrides,
+                    generatedMethods,
+                    functionNames);
         }
 
         // Generate Java methods for remaining properties that are not
@@ -900,7 +876,7 @@ public final class JavaAdapter implements IdFunctionCall {
         }
     }
 
-    private static void generateMethod(
+    static void generateMethod(
             ClassFileWriter cfw,
             String genName,
             String methodName,
@@ -1039,7 +1015,7 @@ public final class JavaAdapter implements IdFunctionCall {
      * equivalent to calling "super.methodName()" from Java. Eventually, this may be supported
      * directly in JavaScript.
      */
-    private static void generateSuper(
+    static void generateSuper(
             ClassFileWriter cfw,
             String genName,
             String superName,
@@ -1072,7 +1048,7 @@ public final class JavaAdapter implements IdFunctionCall {
     }
 
     /** Returns a fully qualified method name concatenated with its signature. */
-    private static String getMethodSignature(Method method, Class<?>[] argTypes) {
+    static String getMethodSignature(Method method, Class<?>[] argTypes) {
         StringBuilder sb = new StringBuilder();
         appendMethodSignature(argTypes, method.getReturnType(), sb);
         return sb.toString();
